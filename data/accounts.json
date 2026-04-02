@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "version": 1,
+    "updatedAt": "2026-04-02T02:04:44.075Z",
+    "checksum": "90582a42253c1a9475723b2e94ce192d598196ce2ed016fc9822d447b26ec5cd"
+  },
+  "data": {
+    "accounts": [
+      {
+        "id": "4d33af6f-5a8f-4159-8f99-815bbe598418",
+        "username": "Nouar",
+        "role": "root",
+        "passwordHash": "$2a$12$6jhsAUdHTO7j4cr/oOyMIeHh65Y.3P0XoVPOWD0IojVl/RUYYBs9e",
+        "createdAt": "2026-04-02T00:39:55.461Z",
+        "updatedAt": "2026-04-02T02:04:43.624Z"
+      },
+      {
+        "id": "f911fd18-2a76-4724-8d99-c86df084f6f6",
+        "username": "admin",
+        "role": "admin",
+        "passwordHash": "$2a$12$kWSw8iV.x8UdpKTU0MZ4XeCMjuI6vXx7uVLhJDLfFOxXyucpaTwrO",
+        "createdAt": "2026-04-01T22:17:30.448Z",
+        "updatedAt": "2026-04-02T01:01:59.744Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "version": 1,
+    "updatedAt": "2026-04-02T02:04:44.078Z",
+    "checksum": "f7a76ecf858b4df9a57be0b59d9c1686044f2bd519d243017a6df9b7ae92f0e2"
+  },
+  "data": {
+    "tasks": [
+      {
+        "id": "54e4ee7f-c287-4c8d-b09d-5db954bdd8b1",
+        "num": "2",
+        "name": "Seed task",
+        "about": "verify",
+        "priority": "medium",
+        "status": "inprogress",
+        "due": "2026-04-01",
+        "missionMgr": "",
+        "mailDate": "",
+        "procDate": "",
+        "responsible": "",
+        "synthese": "",
+        "obs": "",
+        "createdAt": "2026-04-01T22:19:27.990Z",
+        "updatedAt": "2026-04-01T23:31:33.476Z",
+        "title": "Seed task",
+        "description": "verify",
+        "dueDate": "2026-04-01"
+      }
+    ]
+  }
+}
