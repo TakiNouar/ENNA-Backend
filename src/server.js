@@ -5,13 +5,23 @@ require("dotenv").config({
 
 const { PORT } = require("./config");
 const { app } = require("./app");
+const { connectToDatabase } = require("./db/mongoose");
+const {
+  migrateLegacyJsonData,
+} = require("./db/migrateLegacyJson");
 const {
   accountService,
 } = require("./services/accountService");
+const {
+  meetingService,
+} = require("./services/meetingService");
 const { taskService } = require("./services/taskService");
 
 async function start() {
+  await connectToDatabase();
+  await migrateLegacyJsonData();
   await accountService.init();
+  await meetingService.init();
   await taskService.init();
 
   app.listen(PORT, () => {

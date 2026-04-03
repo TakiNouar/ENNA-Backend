@@ -1,18 +1,25 @@
-const path = require("path");
 const { randomUUID } = require("crypto");
-const { DATA_DIR } = require("../config");
 const {
   sanitizeText,
   TASK_PRIORITY_VALUES,
   TASK_STATUS_VALUES,
   validateTaskInput,
 } = require("../middleware/validation");
-const { JsonStore } = require("../utils/jsonStore");
+const { Task } = require("../models/Task");
 
-const taskStore = new JsonStore(
-  path.join(DATA_DIR, "tasks.json"),
-  { tasks: [] },
-);
+function toIsoString(value) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  const date =
+    value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return date.toISOString();
+}
 
 class TaskService {
   normalizeStoredTask(task = {}) {
@@ -21,7 +28,7 @@ class TaskService {
       task.priority,
     ).toLowerCase();
     const normalized = {
-      id: task.id || randomUUID(),
+      id: sanitizeText(task.id) || randomUUID(),
       num: sanitizeText(task.num),
       name: sanitizeText(task.name || task.title),
       about: sanitizeText(task.about || task.description),
@@ -38,11 +45,10 @@ class TaskService {
       responsible: sanitizeText(task.responsible),
       synthese: sanitizeText(task.synthese),
       obs: sanitizeText(task.obs),
-      createdAt: task.createdAt || new Date().toISOString(),
-      updatedAt:
-        task.updatedAt ||
-        task.createdAt ||
-        new Date().toISOString(),
+      createdAt: toIsoString(task.createdAt),
+      updatedAt: toIsoString(
+        task.updatedAt || task.createdAt,
+      ),
     };
 
     return {
@@ -51,6 +57,26 @@ class TaskService {
       title: normalized.name,
       description: normalized.about,
       dueDate: normalized.due,
+    };
+  }
+
+  toPersistenceTask(task) {
+    return {
+      id: task.id,
+      num: task.num,
+      name: task.name,
+      about: task.about,
+      priority: task.priority,
+      status: task.status,
+      due: task.due,
+      missionMgr: task.missionMgr,
+      mailDate: task.mailDate,
+      procDate: task.procDate,
+      responsible: task.responsible,
+      synthese: task.synthese,
+      obs: task.obs,
+      createdAt: new Date(task.createdAt),
+      updatedAt: new Date(task.updatedAt),
     };
   }
 
@@ -139,51 +165,32 @@ class TaskService {
     task.dueDate = task.due;
   }
 
-  async init() {
-    await taskStore.init();
-
-    await taskStore.update((state) => {
-      state.tasks = Array.isArray(state.tasks)
-        ? state.tasks.map((task) =>
-            this.normalizeStoredTask(task),
-          )
-        : [];
-      return state;
-    });
-  }
+  async init() {}
 
   async listTasks() {
-    const state = await taskStore.read();
-    return Array.isArray(state.tasks)
-      ? state.tasks.map((task) =>
-          this.normalizeStoredTask(task),
-        )
-      : [];
+    const tasks = await Task.find({}, null, {
+      sort: { createdAt: 1 },
+    }).lean();
+
+    return tasks.map((task) =>
+      this.normalizeStoredTask(task),
+    );
   }
 
   async createTask(payload) {
     const input = validateTaskInput(payload);
 
-    let createdTask = null;
-    await taskStore.update((state) => {
-      const timestamp = new Date().toISOString();
-      const task = this.normalizeStoredTask({
-        id: randomUUID(),
-        ...input,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
-
-      if (!Array.isArray(state.tasks)) {
-        state.tasks = [];
-      }
-
-      state.tasks.push(task);
-      createdTask = task;
-      return state;
+    const timestamp = new Date().toISOString();
+    const task = this.normalizeStoredTask({
+      id: randomUUID(),
+      ...input,
+      createdAt: timestamp,
+      updatedAt: timestamp,
     });
 
-    return createdTask;
+    await Task.create(this.toPersistenceTask(task));
+
+    return task;
   }
 
   async updateTask(taskId, payload) {
@@ -191,46 +198,32 @@ class TaskService {
       partial: true,
     });
 
-    let updatedTask = null;
-    await taskStore.update((state) => {
-      const tasks = Array.isArray(state.tasks)
-        ? state.tasks
-        : [];
-      const index = tasks.findIndex(
-        (item) => item.id === taskId,
-      );
-      if (index < 0) {
-        throw new Error("Task not found");
-      }
+    const existingTask = await Task.findOne({
+      id: taskId,
+    }).lean();
+    if (!existingTask) {
+      throw new Error("Task not found");
+    }
 
-      const task = this.normalizeStoredTask(tasks[index]);
-      this.applyTaskInput(task, input);
-      task.updatedAt = new Date().toISOString();
+    const task = this.normalizeStoredTask(existingTask);
+    this.applyTaskInput(task, input);
+    task.updatedAt = new Date().toISOString();
 
-      tasks[index] = task;
-      state.tasks = tasks;
-      updatedTask = task;
-      return state;
-    });
+    await Task.updateOne(
+      { id: taskId },
+      this.toPersistenceTask(task),
+    );
 
-    return updatedTask;
+    return task;
   }
 
   async deleteTask(taskId) {
-    await taskStore.update((state) => {
-      if (!Array.isArray(state.tasks)) {
-        state.tasks = [];
-      }
-
-      const index = state.tasks.findIndex(
-        (item) => item.id === taskId,
-      );
-      if (index < 0) {
-        throw new Error("Task not found");
-      }
-      state.tasks.splice(index, 1);
-      return state;
+    const result = await Task.deleteOne({
+      id: taskId,
     });
+    if (!result.deletedCount) {
+      throw new Error("Task not found");
+    }
 
     return { ok: true };
   }

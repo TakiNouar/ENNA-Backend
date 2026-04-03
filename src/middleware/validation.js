@@ -69,6 +69,22 @@ function validateDateField(value, fieldName) {
   return dateValue;
 }
 
+function normalizeDateTimeField(value, fieldName) {
+  const text = sanitizeText(value || "");
+  if (!text) {
+    throw new Error(`${fieldName} is required`);
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(
+      `${fieldName} must be a valid date/time`,
+    );
+  }
+
+  return parsed.toISOString();
+}
+
 function validateTaskInput(
   input = {},
   { partial = false } = {},
@@ -206,6 +222,95 @@ function validateTaskInput(
   return result;
 }
 
+function validateMeetingInput(
+  input = {},
+  { partial = false } = {},
+) {
+  const has = (key) =>
+    Object.prototype.hasOwnProperty.call(input, key);
+
+  const shouldValidateNumber = has("number") || has("num");
+  const shouldValidateSubject =
+    !partial ||
+    has("subject") ||
+    has("name") ||
+    has("title");
+  const shouldValidateDateTime =
+    !partial || has("dateTime") || has("date");
+  const shouldValidateWith = !partial || has("with");
+  const shouldValidateNote =
+    !partial ||
+    has("note") ||
+    has("obs") ||
+    has("description");
+
+  const result = {};
+
+  if (shouldValidateNumber) {
+    const number = sanitizeText(
+      input.number || input.num || "",
+    );
+    if (!number) {
+      throw new Error(
+        "Meeting number cannot be empty when provided",
+      );
+    }
+    if (number.length > 40) {
+      throw new Error(
+        "Meeting number must be at most 40 characters",
+      );
+    }
+    result.number = number;
+  }
+
+  if (shouldValidateSubject) {
+    const subject = sanitizeText(
+      input.subject || input.name || input.title || "",
+    );
+    if (subject.length < 3 || subject.length > 180) {
+      throw new Error(
+        "Meeting subject must be between 3 and 180 characters",
+      );
+    }
+    result.subject = subject;
+  }
+
+  if (shouldValidateDateTime) {
+    const dateTimeInput = has("dateTime")
+      ? input.dateTime
+      : input.date;
+
+    if (partial && !has("dateTime") && !has("date")) {
+      // No-op for partial update when field is omitted.
+    } else {
+      result.dateTime = normalizeDateTimeField(
+        dateTimeInput,
+        "Meeting date/time",
+      );
+    }
+  }
+
+  if (shouldValidateWith) {
+    const withValue = sanitizeText(input.with || "");
+    if (withValue.length > 120) {
+      throw new Error("Meeting with-field is too long");
+    }
+    result.with = withValue;
+  }
+
+  if (shouldValidateNote) {
+    const note = sanitizeText(
+      input.note || input.obs || input.description || "",
+    );
+    if (note.length > 2000) {
+      throw new Error("Meeting note is too long");
+    }
+    result.note = note;
+  }
+
+  return result;
+}
+
 module.exports = {
   ROLE_VALUES,
   TASK_STATUS_VALUES,
@@ -215,4 +320,5 @@ module.exports = {
   validatePassword,
   validateRole,
   validateTaskInput,
+  validateMeetingInput,
 };
