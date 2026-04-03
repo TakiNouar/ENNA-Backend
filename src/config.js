@@ -1,13 +1,41 @@
 const path = require("path");
+const crypto = require("crypto");
 
-function required(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${name}`,
-    );
+function resolveJwtSecret({
+  nodeEnv,
+  explicitSecret,
+  mongoUri,
+  mongoDbName,
+  rootAccountPassword,
+}) {
+  const directSecret = String(explicitSecret || "").trim();
+  if (directSecret) {
+    return directSecret;
   }
-  return value;
+
+  const seed = [mongoUri, mongoDbName, rootAccountPassword]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join("|");
+
+  if (!seed) {
+    if (nodeEnv === "production") {
+      throw new Error(
+        "Missing required environment variable: JWT_SECRET",
+      );
+    }
+
+    return "dev_local_jwt_secret_change_me_2026";
+  }
+
+  console.warn(
+    "JWT_SECRET missing; using derived fallback secret. Set JWT_SECRET in environment.",
+  );
+
+  return crypto
+    .createHash("sha256")
+    .update(seed)
+    .digest("hex");
 }
 
 function parseBoolean(value, fallback) {
@@ -50,19 +78,30 @@ function parseSameSite(value) {
 }
 
 const NODE_ENV = process.env.NODE_ENV || "development";
+const MONGODB_URI =
+  process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
+const MONGODB_DB_NAME =
+  process.env.MONGODB_DB_NAME || "enna_app";
+const ROOT_ACCOUNT_PASSWORD =
+  process.env.ROOT_ACCOUNT_PASSWORD || "NouarAdmin1979";
+const JWT_SECRET = resolveJwtSecret({
+  nodeEnv: NODE_ENV,
+  explicitSecret: process.env.JWT_SECRET,
+  mongoUri: MONGODB_URI,
+  mongoDbName: MONGODB_DB_NAME,
+  rootAccountPassword: ROOT_ACCOUNT_PASSWORD,
+});
 
 module.exports = {
   NODE_ENV,
   PORT: Number(process.env.PORT || 4000),
-  MONGODB_URI:
-    process.env.MONGODB_URI || "mongodb://127.0.0.1:27017",
-  MONGODB_DB_NAME:
-    process.env.MONGODB_DB_NAME || "enna_app",
+  MONGODB_URI,
+  MONGODB_DB_NAME,
   MIGRATE_LEGACY_JSON: parseBoolean(
     process.env.MIGRATE_LEGACY_JSON,
     true,
   ),
-  JWT_SECRET: required("JWT_SECRET"),
+  JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "8h",
   CORS_ALLOWED_ORIGINS: parseOrigins(
     process.env.CORS_ALLOWED_ORIGINS,
@@ -91,8 +130,7 @@ module.exports = {
     process.env.BOOTSTRAP_ADMIN_PASSWORD,
   ROOT_ACCOUNT_USERNAME:
     process.env.ROOT_ACCOUNT_USERNAME || "root",
-  ROOT_ACCOUNT_PASSWORD:
-    process.env.ROOT_ACCOUNT_PASSWORD || "NouarAdmin1979",
+  ROOT_ACCOUNT_PASSWORD,
   DATA_DIR: path.resolve(__dirname, "../data"),
   FRONTEND_DIST_DIR: path.resolve(
     __dirname,
