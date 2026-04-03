@@ -1,9 +1,7 @@
-const path = require("path");
 const { randomUUID } = require("crypto");
 const {
   BOOTSTRAP_ADMIN_PASSWORD,
   BOOTSTRAP_ADMIN_USERNAME,
-  DATA_DIR,
   ROOT_ACCOUNT_PASSWORD,
   ROOT_ACCOUNT_USERNAME,
 } = require("../config");
@@ -16,147 +14,158 @@ const {
   hashPassword,
   verifyPassword,
 } = require("../utils/password");
-const { JsonStore } = require("../utils/jsonStore");
-
-const accountStore = new JsonStore(
-  path.join(DATA_DIR, "accounts.json"),
-  { accounts: [] },
-);
+const { Account } = require("../models/Account");
 
 const ROOT_ROLE = "root";
 
-function toPublicAccount(account) {
+function toIsoString(value) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  const date =
+    value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString();
+  }
+
+  return date.toISOString();
+}
+
+function toPublicAccount(accountInput) {
+  const account =
+    typeof accountInput?.toObject === "function"
+      ? accountInput.toObject()
+      : accountInput;
+
   return {
     id: account.id,
     username: account.username,
     role: account.role,
-    createdAt: account.createdAt,
-    updatedAt: account.updatedAt,
+    createdAt: toIsoString(account.createdAt),
+    updatedAt: toIsoString(account.updatedAt),
   };
 }
 
 class AccountService {
   async init() {
-    await accountStore.init();
     await this.ensureRootAccount();
     await this.ensureBootstrapAdmin();
   }
 
   async ensureRootAccount() {
-    await accountStore.update(async (state) => {
-      const rootUsername = validateUsername(
-        ROOT_ACCOUNT_USERNAME,
-      );
-      const rootPassword = validatePassword(
-        ROOT_ACCOUNT_PASSWORD,
-      );
+    const rootUsername = validateUsername(
+      ROOT_ACCOUNT_USERNAME,
+    );
+    const rootPassword = validatePassword(
+      ROOT_ACCOUNT_PASSWORD,
+    );
 
-      const rootAccounts = state.accounts.filter(
-        (account) => account.role === ROOT_ROLE,
-      );
+    const rootAccounts = await Account.find({
+      role: ROOT_ROLE,
+    }).sort({ createdAt: 1 });
 
-      if (rootAccounts.length > 1) {
-        const keeperId = rootAccounts[0].id;
-        state.accounts = state.accounts.filter(
-          (account) =>
-            account.role !== ROOT_ROLE ||
-            account.id === keeperId,
+    if (rootAccounts.length > 1) {
+      const duplicateIds = rootAccounts
+        .slice(1)
+        .map((account) => account.id);
+
+      await Account.deleteMany({
+        id: { $in: duplicateIds },
+      });
+    }
+
+    const rootAccount = rootAccounts[0];
+
+    if (!rootAccount) {
+      const usernameTakenByOther = await Account.exists({
+        usernameLower: rootUsername.toLowerCase(),
+        role: { $ne: ROOT_ROLE },
+      });
+
+      if (usernameTakenByOther) {
+        throw new Error(
+          "Configured root username already exists with a non-root role",
         );
       }
 
-      let rootAccount = state.accounts.find(
-        (account) => account.role === ROOT_ROLE,
-      );
+      await Account.create({
+        id: randomUUID(),
+        username: rootUsername,
+        usernameLower: rootUsername.toLowerCase(),
+        role: ROOT_ROLE,
+        passwordHash: await hashPassword(rootPassword),
+      });
+      return;
+    }
 
-      if (!rootAccount) {
-        const usernameTakenByOther = state.accounts.some(
-          (account) =>
-            account.username.toLowerCase() ===
-            rootUsername.toLowerCase(),
-        );
+    let changed = false;
 
-        if (usernameTakenByOther) {
-          throw new Error(
-            "Configured root username already exists with a non-root role",
-          );
-        }
+    if (
+      rootAccount.usernameLower !==
+      rootUsername.toLowerCase()
+    ) {
+      rootAccount.username = rootUsername;
+      rootAccount.usernameLower =
+        rootUsername.toLowerCase();
+      changed = true;
+    }
 
-        rootAccount = {
-          id: randomUUID(),
-          username: rootUsername,
-          role: ROOT_ROLE,
-          passwordHash: await hashPassword(rootPassword),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+    const passwordMatches = await verifyPassword(
+      rootPassword,
+      rootAccount.passwordHash,
+    );
 
-        state.accounts.unshift(rootAccount);
-        return state;
-      }
+    if (!passwordMatches) {
+      rootAccount.passwordHash =
+        await hashPassword(rootPassword);
+      changed = true;
+    }
 
-      let changed = false;
-      const now = new Date().toISOString();
-
-      if (
-        rootAccount.username.toLowerCase() !==
-        rootUsername.toLowerCase()
-      ) {
-        rootAccount.username = rootUsername;
-        changed = true;
-      }
-
-      const passwordMatches = await verifyPassword(
-        rootPassword,
-        rootAccount.passwordHash,
-      );
-
-      if (!passwordMatches) {
-        rootAccount.passwordHash =
-          await hashPassword(rootPassword);
-        changed = true;
-      }
-
-      if (changed) {
-        rootAccount.updatedAt = now;
-      }
-
-      return state;
-    });
+    if (changed) {
+      await rootAccount.save();
+    }
   }
 
   async ensureBootstrapAdmin() {
-    await accountStore.update(async (state) => {
-      const hasAdmin = state.accounts.some(
-        (account) => account.role === "admin",
+    const hasAdmin = await Account.exists({
+      role: "admin",
+    });
+    if (hasAdmin) {
+      return;
+    }
+
+    if (
+      !BOOTSTRAP_ADMIN_USERNAME ||
+      !BOOTSTRAP_ADMIN_PASSWORD
+    ) {
+      throw new Error(
+        "No admin account exists. Set BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD in environment.",
       );
-      if (hasAdmin) return state;
+    }
 
-      if (
-        !BOOTSTRAP_ADMIN_USERNAME ||
-        !BOOTSTRAP_ADMIN_PASSWORD
-      ) {
-        throw new Error(
-          "No admin account exists. Set BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD in environment.",
-        );
-      }
+    const username = validateUsername(
+      BOOTSTRAP_ADMIN_USERNAME,
+    );
+    const password = validatePassword(
+      BOOTSTRAP_ADMIN_PASSWORD,
+    );
 
-      const username = validateUsername(
-        BOOTSTRAP_ADMIN_USERNAME,
+    const usernameExists = await Account.exists({
+      usernameLower: username.toLowerCase(),
+    });
+    if (usernameExists) {
+      throw new Error(
+        "Bootstrap admin username already exists",
       );
-      const password = validatePassword(
-        BOOTSTRAP_ADMIN_PASSWORD,
-      );
+    }
 
-      state.accounts.push({
-        id: randomUUID(),
-        username,
-        role: "admin",
-        passwordHash: await hashPassword(password),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      return state;
+    await Account.create({
+      id: randomUUID(),
+      username,
+      usernameLower: username.toLowerCase(),
+      role: "admin",
+      passwordHash: await hashPassword(password),
     });
   }
 
@@ -164,12 +173,9 @@ class AccountService {
     const username = validateUsername(usernameInput);
     const password = validatePassword(passwordInput);
 
-    const state = await accountStore.read();
-    const account = state.accounts.find(
-      (item) =>
-        item.username.toLowerCase() ===
-        username.toLowerCase(),
-    );
+    const account = await Account.findOne({
+      usernameLower: username.toLowerCase(),
+    }).lean();
 
     if (!account) return null;
 
@@ -183,8 +189,11 @@ class AccountService {
   }
 
   async listAccounts() {
-    const state = await accountStore.read();
-    return state.accounts.map(toPublicAccount);
+    const accounts = await Account.find({}, null, {
+      sort: { createdAt: 1 },
+    }).lean();
+
+    return accounts.map(toPublicAccount);
   }
 
   async createAccount(payload, actor) {
@@ -212,32 +221,29 @@ class AccountService {
       );
     }
 
-    let createdAccount = null;
-    await accountStore.update(async (state) => {
-      const exists = state.accounts.some(
-        (item) =>
-          item.username.toLowerCase() ===
-          username.toLowerCase(),
-      );
-      if (exists) {
-        throw new Error("Username already exists");
-      }
+    const exists = await Account.exists({
+      usernameLower: username.toLowerCase(),
+    });
+    if (exists) {
+      throw new Error("Username already exists");
+    }
 
-      const account = {
+    try {
+      const createdAccount = await Account.create({
         id: randomUUID(),
         username,
+        usernameLower: username.toLowerCase(),
         role,
         passwordHash: await hashPassword(password),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      });
 
-      state.accounts.push(account);
-      createdAccount = toPublicAccount(account);
-      return state;
-    });
-
-    return createdAccount;
+      return toPublicAccount(createdAccount);
+    } catch (error) {
+      if (error?.code === 11000) {
+        throw new Error("Username already exists");
+      }
+      throw error;
+    }
   }
 
   async deleteAccount(accountId, actor) {
@@ -248,37 +254,32 @@ class AccountService {
       throw new Error("Forbidden");
     }
 
-    await accountStore.update(async (state) => {
-      const targetIndex = state.accounts.findIndex(
-        (item) => item.id === accountId,
-      );
-      if (targetIndex < 0) {
-        throw new Error("Account not found");
-      }
-
-      const target = state.accounts[targetIndex];
-
-      if (target.role === ROOT_ROLE) {
-        throw new Error("Root account cannot be deleted");
-      }
-
-      if (actor.role === "admin") {
-        if (target.id === actor.id) {
-          throw new Error(
-            "Admins cannot delete their own account",
-          );
-        }
-
-        if (target.role === "admin") {
-          throw new Error(
-            "Admins cannot delete other admins",
-          );
-        }
-      }
-
-      state.accounts.splice(targetIndex, 1);
-      return state;
+    const target = await Account.findOne({
+      id: accountId,
     });
+    if (!target) {
+      throw new Error("Account not found");
+    }
+
+    if (target.role === ROOT_ROLE) {
+      throw new Error("Root account cannot be deleted");
+    }
+
+    if (actor.role === "admin") {
+      if (target.id === actor.id) {
+        throw new Error(
+          "Admins cannot delete their own account",
+        );
+      }
+
+      if (target.role === "admin") {
+        throw new Error(
+          "Admins cannot delete other admins",
+        );
+      }
+    }
+
+    await Account.deleteOne({ id: accountId });
 
     return { ok: true };
   }
@@ -295,44 +296,37 @@ class AccountService {
       throw new Error("Only root can change account roles");
     }
 
-    let updatedAccount = null;
-    await accountStore.update(async (state) => {
-      const target = state.accounts.find(
-        (item) => item.id === accountId,
-      );
-      if (!target) {
-        throw new Error("Account not found");
-      }
-
-      const requestedRole = String(roleInput || "")
-        .trim()
-        .toLowerCase();
-
-      // Keep current role without forcing a write, including root.
-      if (requestedRole === target.role) {
-        updatedAccount = toPublicAccount(target);
-        return state;
-      }
-
-      const role = validateRole(requestedRole);
-
-      if (target.role === ROOT_ROLE) {
-        throw new Error(
-          "Root account role cannot be changed",
-        );
-      }
-
-      if (target.id === actor.id && role !== ROOT_ROLE) {
-        throw new Error("Root role cannot be changed");
-      }
-
-      target.role = role;
-      target.updatedAt = new Date().toISOString();
-      updatedAccount = toPublicAccount(target);
-      return state;
+    const target = await Account.findOne({
+      id: accountId,
     });
+    if (!target) {
+      throw new Error("Account not found");
+    }
 
-    return updatedAccount;
+    const requestedRole = String(roleInput || "")
+      .trim()
+      .toLowerCase();
+
+    if (requestedRole === target.role) {
+      return toPublicAccount(target);
+    }
+
+    const role = validateRole(requestedRole);
+
+    if (target.role === ROOT_ROLE) {
+      throw new Error(
+        "Root account role cannot be changed",
+      );
+    }
+
+    if (target.id === actor.id && role !== ROOT_ROLE) {
+      throw new Error("Root role cannot be changed");
+    }
+
+    target.role = role;
+    await target.save();
+
+    return toPublicAccount(target);
   }
 
   async resetPassword(accountId, newPasswordInput, actor) {
@@ -345,40 +339,32 @@ class AccountService {
 
     const newPassword = validatePassword(newPasswordInput);
 
-    let updatedAccount = null;
-    await accountStore.update(async (state) => {
-      const target = state.accounts.find(
-        (item) => item.id === accountId,
-      );
-      if (!target) {
-        throw new Error("Account not found");
-      }
-
-      if (
-        actor.role === "admin" &&
-        target.id !== actor.id
-      ) {
-        throw new Error(
-          "Admins can only reset their own password",
-        );
-      }
-
-      if (
-        target.role === ROOT_ROLE &&
-        actor.role !== ROOT_ROLE
-      ) {
-        throw new Error(
-          "Root password can only be reset by root",
-        );
-      }
-
-      target.passwordHash = await hashPassword(newPassword);
-      target.updatedAt = new Date().toISOString();
-      updatedAccount = toPublicAccount(target);
-      return state;
+    const target = await Account.findOne({
+      id: accountId,
     });
+    if (!target) {
+      throw new Error("Account not found");
+    }
 
-    return updatedAccount;
+    if (actor.role === "admin" && target.id !== actor.id) {
+      throw new Error(
+        "Admins can only reset their own password",
+      );
+    }
+
+    if (
+      target.role === ROOT_ROLE &&
+      actor.role !== ROOT_ROLE
+    ) {
+      throw new Error(
+        "Root password can only be reset by root",
+      );
+    }
+
+    target.passwordHash = await hashPassword(newPassword);
+    await target.save();
+
+    return toPublicAccount(target);
   }
 }
 

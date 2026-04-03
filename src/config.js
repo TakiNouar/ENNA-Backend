@@ -54,6 +54,14 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 module.exports = {
   NODE_ENV,
   PORT: Number(process.env.PORT || 4000),
+  MONGODB_URI:
+    process.env.MONGODB_URI || "mongodb://127.0.0.1:27017",
+  MONGODB_DB_NAME:
+    process.env.MONGODB_DB_NAME || "enna_app",
+  MIGRATE_LEGACY_JSON: parseBoolean(
+    process.env.MIGRATE_LEGACY_JSON,
+    true,
+  ),
   JWT_SECRET: required("JWT_SECRET"),
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "8h",
   CORS_ALLOWED_ORIGINS: parseOrigins(
