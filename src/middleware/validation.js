@@ -235,6 +235,9 @@ function validateMeetingInput(
     has("subject") ||
     has("name") ||
     has("title");
+  const shouldValidatePriority =
+    !partial || has("priority");
+  const shouldValidateStatus = !partial || has("status");
   const shouldValidateDateTime =
     !partial || has("dateTime") || has("date");
   const shouldValidateWith = !partial || has("with");
@@ -273,6 +276,18 @@ function validateMeetingInput(
       );
     }
     result.subject = subject;
+  }
+
+  if (shouldValidatePriority) {
+    result.priority = has("priority")
+      ? validateTaskPriority(input.priority)
+      : "medium";
+  }
+
+  if (shouldValidateStatus) {
+    result.status = has("status")
+      ? validateTaskStatus(input.status)
+      : "todo";
   }
 
   if (shouldValidateDateTime) {

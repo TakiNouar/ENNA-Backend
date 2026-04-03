@@ -16,6 +16,16 @@ const meetingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    priority: {
+      type: String,
+      default: "medium",
+      index: true,
+    },
+    status: {
+      type: String,
+      default: "todo",
+      index: true,
+    },
     dateTime: {
       type: Date,
       required: true,

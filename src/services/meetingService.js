@@ -1,6 +1,8 @@
 const { randomUUID } = require("crypto");
 const {
   sanitizeText,
+  TASK_PRIORITY_VALUES,
+  TASK_STATUS_VALUES,
   validateMeetingInput,
 } = require("../middleware/validation");
 const { Meeting } = require("../models/Meeting");
@@ -114,12 +116,25 @@ class MeetingService {
   }
 
   normalizeStoredMeeting(meeting = {}) {
+    const priority = sanitizeText(
+      meeting.priority,
+    ).toLowerCase();
+    const status = sanitizeText(
+      meeting.status,
+    ).toLowerCase();
+
     return {
       id: sanitizeText(meeting.id) || randomUUID(),
       number: sanitizeText(meeting.number || meeting.num),
       subject: sanitizeText(
         meeting.subject || meeting.name || meeting.title,
       ),
+      priority: TASK_PRIORITY_VALUES.includes(priority)
+        ? priority
+        : "medium",
+      status: TASK_STATUS_VALUES.includes(status)
+        ? status
+        : "todo",
       dateTime: toIsoString(meeting.dateTime),
       with: sanitizeText(meeting.with),
       note: sanitizeText(
@@ -137,6 +152,8 @@ class MeetingService {
       id: meeting.id,
       number: meeting.number,
       subject: meeting.subject,
+      priority: meeting.priority,
+      status: meeting.status,
       dateTime: new Date(meeting.dateTime),
       with: meeting.with,
       note: meeting.note,
@@ -156,6 +173,21 @@ class MeetingService {
       Object.prototype.hasOwnProperty.call(input, "subject")
     ) {
       meeting.subject = input.subject;
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        input,
+        "priority",
+      )
+    ) {
+      meeting.priority = input.priority;
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(input, "status")
+    ) {
+      meeting.status = input.status;
     }
 
     if (

@@ -106,6 +106,12 @@ function normalizeLegacyTask(legacyTask = {}) {
 }
 
 function normalizeLegacyMeeting(legacyMeeting = {}) {
+  const status = sanitizeText(
+    legacyMeeting.status,
+  ).toLowerCase();
+  const priority = sanitizeText(
+    legacyMeeting.priority,
+  ).toLowerCase();
   const dateTime = parseDate(
     legacyMeeting.dateTime || legacyMeeting.date,
   );
@@ -124,6 +130,12 @@ function normalizeLegacyMeeting(legacyMeeting = {}) {
         legacyMeeting.name ||
         legacyMeeting.title,
     ),
+    priority: TASK_PRIORITY_VALUES.includes(priority)
+      ? priority
+      : "medium",
+    status: TASK_STATUS_VALUES.includes(status)
+      ? status
+      : "todo",
     dateTime,
     with: sanitizeText(legacyMeeting.with),
     note: sanitizeText(
