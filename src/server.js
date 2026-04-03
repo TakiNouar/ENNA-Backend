@@ -1,7 +1,18 @@
 const path = require("path");
-require("dotenv").config({
-  path: path.resolve(__dirname, "../.env"),
-});
+const fs = require("fs");
+const dotenv = require("dotenv");
+
+// Load local env files when present (Render dashboard env vars still win).
+const envFiles = [
+  path.resolve(__dirname, "../.env"),
+  path.resolve(__dirname, "../.env.render"),
+];
+
+for (const envFile of envFiles) {
+  if (fs.existsSync(envFile)) {
+    dotenv.config({ path: envFile });
+  }
+}
 
 const { PORT } = require("./config");
 const { app } = require("./app");
