@@ -7,6 +7,7 @@ function signAuthToken(user) {
       sub: user.id,
       username: user.username,
       role: user.role,
+      type: user.type,
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN },

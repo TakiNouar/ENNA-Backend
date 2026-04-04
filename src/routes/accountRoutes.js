@@ -5,6 +5,7 @@ const {
   listAccounts,
   resetPassword,
   updateRole,
+  updateType,
 } = require("../controllers/accountController");
 
 const router = express.Router();
@@ -12,6 +13,7 @@ const router = express.Router();
 router.get("/", listAccounts);
 router.post("/", createAccount);
 router.patch("/:accountId/role", updateRole);
+router.patch("/:accountId/type", updateType);
 router.patch("/:accountId/password", resetPassword);
 router.delete("/:accountId", deleteAccount);
 

@@ -13,6 +13,7 @@ const { requireAuth } = require("./middleware/auth");
 const { requireRole } = require("./middleware/requireRole");
 const accountRoutes = require("./routes/accountRoutes");
 const authRoutes = require("./routes/authRoutes");
+const communicationRoutes = require("./routes/communicationRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 
@@ -58,6 +59,11 @@ app.use(express.json({ limit: "16kb" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/meetings", requireAuth, meetingRoutes);
 app.use("/api/tasks", requireAuth, taskRoutes);
+app.use(
+  "/api/communications",
+  requireAuth,
+  communicationRoutes,
+);
 app.use(
   "/api/admin/accounts",
   requireAuth,

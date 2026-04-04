@@ -36,6 +36,19 @@ async function updateRole(req, res, next) {
   }
 }
 
+async function updateType(req, res, next) {
+  try {
+    const account = await accountService.updateType(
+      req.params.accountId,
+      req.body.type,
+      req.user,
+    );
+    return res.json({ account });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function resetPassword(req, res, next) {
   try {
     const account = await accountService.resetPassword(
@@ -65,6 +78,7 @@ module.exports = {
   listAccounts,
   createAccount,
   updateRole,
+  updateType,
   resetPassword,
   deleteAccount,
 };

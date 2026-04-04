@@ -6,12 +6,18 @@ const {
   MIGRATE_LEGACY_JSON,
 } = require("../config");
 const { Account } = require("../models/Account");
+const {
+  Communication,
+} = require("../models/Communication");
 const { Meeting } = require("../models/Meeting");
 const { Task } = require("../models/Task");
 const {
+  COMMUNICATION_STATUS_VALUES,
+  COMMUNICATION_TYPE_VALUES,
   sanitizeText,
   TASK_PRIORITY_VALUES,
   TASK_STATUS_VALUES,
+  validateUserType,
   validateRole,
   validateUsername,
 } = require("../middleware/validation");
@@ -62,10 +68,54 @@ function normalizeLegacyAccount(legacyAccount = {}) {
     username,
     usernameLower: username.toLowerCase(),
     role,
+    type:
+      role === "root" || role === "admin"
+        ? "global"
+        : legacyAccount.type
+          ? validateUserType(legacyAccount.type)
+          : "none",
     passwordHash,
     createdAt,
     updatedAt: parseDate(
       legacyAccount.updatedAt,
+      createdAt,
+    ),
+  };
+}
+
+function normalizeLegacyCommunication(
+  legacyCommunication = {},
+) {
+  const type = sanitizeText(
+    legacyCommunication.type,
+  ).toLowerCase();
+  const status = sanitizeText(
+    legacyCommunication.status,
+  ).toLowerCase();
+  const createdAt = parseDate(
+    legacyCommunication.createdAt,
+  );
+
+  return {
+    id:
+      sanitizeText(legacyCommunication.id) || randomUUID(),
+    number: sanitizeText(legacyCommunication.number),
+    type: COMMUNICATION_TYPE_VALUES.includes(type)
+      ? type
+      : "radar",
+    status: COMMUNICATION_STATUS_VALUES.includes(status)
+      ? status
+      : "active",
+    site: sanitizeText(legacyCommunication.site),
+    equipment: sanitizeText(legacyCommunication.equipment),
+    date: sanitizeText(legacyCommunication.date),
+    observation: sanitizeText(
+      legacyCommunication.observation ||
+        legacyCommunication.obs,
+    ),
+    createdAt,
+    updatedAt: parseDate(
+      legacyCommunication.updatedAt,
       createdAt,
     ),
   };
@@ -290,6 +340,54 @@ async function migrateMeetings() {
   );
 }
 
+async function migrateCommunications() {
+  const communicationCount =
+    await Communication.countDocuments();
+  if (communicationCount > 0) {
+    return;
+  }
+
+  const legacyCommunications = await loadLegacyCollection(
+    "communications.json",
+    "communications",
+  );
+  if (legacyCommunications.length === 0) {
+    return;
+  }
+
+  const nextCommunications = [];
+  for (const legacyCommunication of legacyCommunications) {
+    try {
+      nextCommunications.push(
+        normalizeLegacyCommunication(legacyCommunication),
+      );
+    } catch (error) {
+      console.warn(
+        "Skipping invalid legacy communication entry:",
+        error.message,
+      );
+    }
+  }
+
+  if (nextCommunications.length === 0) {
+    return;
+  }
+
+  try {
+    await Communication.insertMany(nextCommunications, {
+      ordered: false,
+    });
+  } catch (error) {
+    if (!error?.writeErrors) {
+      throw error;
+    }
+  }
+
+  console.log(
+    `Migrated ${nextCommunications.length} communication(s) from JSON data.`,
+  );
+}
+
 async function migrateLegacyJsonData() {
   if (!MIGRATE_LEGACY_JSON) {
     return;
@@ -298,6 +396,7 @@ async function migrateLegacyJsonData() {
   await migrateAccounts();
   await migrateTasks();
   await migrateMeetings();
+  await migrateCommunications();
 }
 
 module.exports = { migrateLegacyJsonData };

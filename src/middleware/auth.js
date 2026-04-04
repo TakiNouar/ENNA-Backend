@@ -15,6 +15,7 @@ function requireAuth(req, res, next) {
       id: payload.sub,
       username: payload.username,
       role: payload.role,
+      type: payload.type || "none",
     };
     return next();
   } catch {

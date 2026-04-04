@@ -1,6 +1,14 @@
 const mongoose = require("mongoose");
 
 const ACCOUNT_ROLES = ["root", "admin", "user"];
+const ACCOUNT_TYPE_VALUES = [
+  "global",
+  "radar",
+  "com",
+  "nav",
+  "atm",
+  "none",
+];
 
 const accountSchema = new mongoose.Schema(
   {
@@ -28,6 +36,13 @@ const accountSchema = new mongoose.Schema(
       enum: ACCOUNT_ROLES,
       required: true,
     },
+    type: {
+      type: String,
+      enum: ACCOUNT_TYPE_VALUES,
+      required: true,
+      default: "none",
+      index: true,
+    },
     passwordHash: {
       type: String,
       required: true,
@@ -43,4 +58,8 @@ const Account =
   mongoose.models.Account ||
   mongoose.model("Account", accountSchema);
 
-module.exports = { Account, ACCOUNT_ROLES };
+module.exports = {
+  Account,
+  ACCOUNT_ROLES,
+  ACCOUNT_TYPE_VALUES,
+};
