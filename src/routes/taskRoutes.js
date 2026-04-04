@@ -8,12 +8,23 @@ const {
 const {
   requireRole,
 } = require("../middleware/requireRole");
+const {
+  requireTasksMeetingsAccess,
+} = require("../middleware/permissions");
 
 const router = express.Router();
 
-router.get("/", listTasks);
-router.post("/", requireRole("admin"), createTask);
-router.patch("/:taskId", requireRole("admin"), updateTask);
-router.delete("/:taskId", requireRole("admin"), deleteTask);
+router.get("/", requireTasksMeetingsAccess, listTasks);
+router.post("/", requireRole("admin", "root"), createTask);
+router.patch(
+  "/:taskId",
+  requireRole("admin", "root"),
+  updateTask,
+);
+router.delete(
+  "/:taskId",
+  requireRole("admin", "root"),
+  deleteTask,
+);
 
 module.exports = router;

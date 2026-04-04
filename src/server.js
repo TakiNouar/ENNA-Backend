@@ -26,6 +26,9 @@ const {
 const {
   meetingService,
 } = require("./services/meetingService");
+const {
+  communicationService,
+} = require("./services/communicationService");
 const { taskService } = require("./services/taskService");
 
 async function start() {
@@ -33,6 +36,7 @@ async function start() {
   await migrateLegacyJsonData();
   await accountService.init();
   await meetingService.init();
+  await communicationService.init();
   await taskService.init();
 
   app.listen(PORT, () => {

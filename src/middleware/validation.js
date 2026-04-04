@@ -1,4 +1,12 @@
 const ROLE_VALUES = ["admin", "user"];
+const USER_TYPE_VALUES = [
+  "global",
+  "radar",
+  "com",
+  "nav",
+  "atm",
+  "none",
+];
 const TASK_STATUS_VALUES = [
   "todo",
   "inprogress",
@@ -6,6 +14,17 @@ const TASK_STATUS_VALUES = [
   "cancelled",
 ];
 const TASK_PRIORITY_VALUES = ["high", "medium", "low"];
+const COMMUNICATION_TYPE_VALUES = [
+  "radar",
+  "com",
+  "nav",
+  "atm",
+];
+const COMMUNICATION_STATUS_VALUES = [
+  "active",
+  "failure",
+  "offline",
+];
 
 function sanitizeText(value) {
   if (typeof value !== "string") return "";
@@ -43,6 +62,16 @@ function validateRole(value) {
   return role;
 }
 
+function validateUserType(value) {
+  const type = sanitizeText(value).toLowerCase();
+  if (!USER_TYPE_VALUES.includes(type)) {
+    throw new Error(
+      "Type must be one of: global, radar, com, nav, atm, none",
+    );
+  }
+  return type;
+}
+
 function validateTaskStatus(value) {
   const status = sanitizeText(value).toLowerCase();
   if (!TASK_STATUS_VALUES.includes(status)) {
@@ -57,6 +86,22 @@ function validateTaskPriority(value) {
     throw new Error("Invalid task priority");
   }
   return priority;
+}
+
+function validateCommunicationType(value) {
+  const type = sanitizeText(value).toLowerCase();
+  if (!COMMUNICATION_TYPE_VALUES.includes(type)) {
+    throw new Error("Invalid communication type");
+  }
+  return type;
+}
+
+function validateCommunicationStatus(value) {
+  const status = sanitizeText(value).toLowerCase();
+  if (!COMMUNICATION_STATUS_VALUES.includes(status)) {
+    throw new Error("Invalid communication status");
+  }
+  return status;
 }
 
 function validateDateField(value, fieldName) {
@@ -326,14 +371,90 @@ function validateMeetingInput(
   return result;
 }
 
+function validateCommunicationInput(
+  input = {},
+  { partial = false } = {},
+) {
+  const has = (key) =>
+    Object.prototype.hasOwnProperty.call(input, key);
+
+  const shouldValidateType = !partial || has("type");
+  const shouldValidateStatus = !partial || has("status");
+  const shouldValidateSite = !partial || has("site");
+  const shouldValidateEquipment =
+    !partial || has("equipment");
+  const shouldValidateDate = !partial || has("date");
+  const shouldValidateObservation =
+    !partial || has("observation") || has("obs");
+
+  const result = {};
+
+  if (shouldValidateType) {
+    result.type = has("type")
+      ? validateCommunicationType(input.type)
+      : "radar";
+  }
+
+  if (shouldValidateStatus) {
+    result.status = has("status")
+      ? validateCommunicationStatus(input.status)
+      : "active";
+  }
+
+  if (shouldValidateSite) {
+    const site = sanitizeText(input.site || "");
+    if (site.length < 1 || site.length > 160) {
+      throw new Error(
+        "Communication site must be between 1 and 160 characters",
+      );
+    }
+    result.site = site;
+  }
+
+  if (shouldValidateEquipment) {
+    const equipment = sanitizeText(input.equipment || "");
+    if (equipment.length < 1 || equipment.length > 160) {
+      throw new Error(
+        "Communication equipment must be between 1 and 160 characters",
+      );
+    }
+    result.equipment = equipment;
+  }
+
+  if (shouldValidateDate) {
+    const date = validateDateField(input.date, "Date");
+    if (!partial && !date) {
+      throw new Error("Date is required");
+    }
+    result.date = date;
+  }
+
+  if (shouldValidateObservation) {
+    const observation = sanitizeText(
+      input.observation || input.obs || "",
+    );
+    if (observation.length > 4000) {
+      throw new Error("Observation is too long");
+    }
+    result.observation = observation;
+  }
+
+  return result;
+}
+
 module.exports = {
   ROLE_VALUES,
+  USER_TYPE_VALUES,
   TASK_STATUS_VALUES,
   TASK_PRIORITY_VALUES,
+  COMMUNICATION_TYPE_VALUES,
+  COMMUNICATION_STATUS_VALUES,
   sanitizeText,
   validateUsername,
   validatePassword,
   validateRole,
+  validateUserType,
   validateTaskInput,
   validateMeetingInput,
+  validateCommunicationInput,
 };

