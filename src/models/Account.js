@@ -7,6 +7,7 @@ const ACCOUNT_TYPE_VALUES = [
   "com",
   "nav",
   "atm",
+  "energy",
   "none",
 ];
 

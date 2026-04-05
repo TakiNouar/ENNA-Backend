@@ -5,6 +5,7 @@ const USER_TYPE_VALUES = [
   "com",
   "nav",
   "atm",
+  "energy",
   "none",
 ];
 const TASK_STATUS_VALUES = [
@@ -19,6 +20,7 @@ const COMMUNICATION_TYPE_VALUES = [
   "com",
   "nav",
   "atm",
+  "energy",
 ];
 const COMMUNICATION_STATUS_VALUES = [
   "active",
@@ -68,7 +70,7 @@ function validateUserType(value) {
     normalized === "radar" ? "surveillance" : normalized;
   if (!USER_TYPE_VALUES.includes(type)) {
     throw new Error(
-      "Type must be one of: global, surveillance, com, nav, atm, none",
+      "Type must be one of: global, surveillance, com, nav, atm, energy, none",
     );
   }
   return type;
