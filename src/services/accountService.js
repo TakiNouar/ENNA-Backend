@@ -41,6 +41,16 @@ function toIsoString(value) {
   return date.toISOString();
 }
 
+function normalizeAccountType(value) {
+  const type = String(value || "none")
+    .trim()
+    .toLowerCase();
+  if (type === "radar") {
+    return "surveillance";
+  }
+  return type || "none";
+}
+
 function toPublicAccount(accountInput) {
   const account =
     typeof accountInput?.toObject === "function"
@@ -51,7 +61,7 @@ function toPublicAccount(accountInput) {
     id: account.id,
     username: account.username,
     role: account.role,
-    type: account.type || "none",
+    type: normalizeAccountType(account.type),
     createdAt: toIsoString(account.createdAt),
     updatedAt: toIsoString(account.updatedAt),
   };
@@ -212,10 +222,18 @@ class AccountService {
     await Account.updateMany(
       {
         role: "user",
+        type: "radar",
+      },
+      { $set: { type: "surveillance" } },
+    );
+
+    await Account.updateMany(
+      {
+        role: "user",
         type: {
           $nin: [
             "global",
-            "radar",
+            "surveillance",
             "com",
             "nav",
             "atm",

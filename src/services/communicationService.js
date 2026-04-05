@@ -124,7 +124,9 @@ class CommunicationService {
   }
 
   normalizeStoredCommunication(row = {}) {
-    const type = sanitizeText(row.type).toLowerCase();
+    const rawType = sanitizeText(row.type).toLowerCase();
+    const type =
+      rawType === "radar" ? "surveillance" : rawType;
     const status = sanitizeText(row.status).toLowerCase();
 
     return {
@@ -132,7 +134,7 @@ class CommunicationService {
       number: sanitizeText(row.number),
       type: COMMUNICATION_TYPE_VALUES.includes(type)
         ? type
-        : "radar",
+        : "surveillance",
       status: COMMUNICATION_STATUS_VALUES.includes(status)
         ? status
         : "active",
