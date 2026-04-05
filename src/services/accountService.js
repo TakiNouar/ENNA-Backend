@@ -237,6 +237,7 @@ class AccountService {
             "com",
             "nav",
             "atm",
+            "energy",
             "none",
           ],
         },
