@@ -1,7 +1,7 @@
 const ROLE_VALUES = ["admin", "user"];
 const USER_TYPE_VALUES = [
   "global",
-  "radar",
+  "surveillance",
   "com",
   "nav",
   "atm",
@@ -15,7 +15,7 @@ const TASK_STATUS_VALUES = [
 ];
 const TASK_PRIORITY_VALUES = ["high", "medium", "low"];
 const COMMUNICATION_TYPE_VALUES = [
-  "radar",
+  "surveillance",
   "com",
   "nav",
   "atm",
@@ -63,10 +63,12 @@ function validateRole(value) {
 }
 
 function validateUserType(value) {
-  const type = sanitizeText(value).toLowerCase();
+  const normalized = sanitizeText(value).toLowerCase();
+  const type =
+    normalized === "radar" ? "surveillance" : normalized;
   if (!USER_TYPE_VALUES.includes(type)) {
     throw new Error(
-      "Type must be one of: global, radar, com, nav, atm, none",
+      "Type must be one of: global, surveillance, com, nav, atm, none",
     );
   }
   return type;
@@ -89,7 +91,9 @@ function validateTaskPriority(value) {
 }
 
 function validateCommunicationType(value) {
-  const type = sanitizeText(value).toLowerCase();
+  const normalized = sanitizeText(value).toLowerCase();
+  const type =
+    normalized === "radar" ? "surveillance" : normalized;
   if (!COMMUNICATION_TYPE_VALUES.includes(type)) {
     throw new Error("Invalid communication type");
   }
@@ -111,6 +115,36 @@ function validateDateField(value, fieldName) {
       `${fieldName} must be in YYYY-MM-DD format`,
     );
   }
+  return dateValue;
+}
+
+function validateCommunicationDateField(value, fieldName) {
+  const dateValue = sanitizeText(value || "");
+  if (!dateValue) {
+    return dateValue;
+  }
+
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(dateValue);
+  const isDateTimeLocal =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateValue);
+
+  if (!isDateOnly && !isDateTimeLocal) {
+    throw new Error(
+      `${fieldName} must be in YYYY-MM-DD or YYYY-MM-DDTHH:mm format`,
+    );
+  }
+
+  const parseCandidate = isDateOnly
+    ? `${dateValue}T00:00`
+    : dateValue;
+  const parsed = new Date(parseCandidate);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(
+      `${fieldName} must be a valid date/time`,
+    );
+  }
+
   return dateValue;
 }
 
@@ -392,7 +426,7 @@ function validateCommunicationInput(
   if (shouldValidateType) {
     result.type = has("type")
       ? validateCommunicationType(input.type)
-      : "radar";
+      : "surveillance";
   }
 
   if (shouldValidateStatus) {
@@ -422,7 +456,10 @@ function validateCommunicationInput(
   }
 
   if (shouldValidateDate) {
-    const date = validateDateField(input.date, "Date");
+    const date = validateCommunicationDateField(
+      input.date,
+      "Date",
+    );
     if (!partial && !date) {
       throw new Error("Date is required");
     }

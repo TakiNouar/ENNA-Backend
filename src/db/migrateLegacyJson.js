@@ -86,9 +86,11 @@ function normalizeLegacyAccount(legacyAccount = {}) {
 function normalizeLegacyCommunication(
   legacyCommunication = {},
 ) {
-  const type = sanitizeText(
+  const rawType = sanitizeText(
     legacyCommunication.type,
   ).toLowerCase();
+  const type =
+    rawType === "radar" ? "surveillance" : rawType;
   const status = sanitizeText(
     legacyCommunication.status,
   ).toLowerCase();
@@ -102,7 +104,7 @@ function normalizeLegacyCommunication(
     number: sanitizeText(legacyCommunication.number),
     type: COMMUNICATION_TYPE_VALUES.includes(type)
       ? type
-      : "radar",
+      : "surveillance",
     status: COMMUNICATION_STATUS_VALUES.includes(status)
       ? status
       : "active",

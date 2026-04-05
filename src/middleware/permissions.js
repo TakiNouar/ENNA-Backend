@@ -2,48 +2,61 @@ function isAdminLike(user) {
   return user?.role === "root" || user?.role === "admin";
 }
 
+function normalizeUserType(value) {
+  const type = String(value || "")
+    .trim()
+    .toLowerCase();
+  return type === "radar" ? "surveillance" : type;
+}
+
 function canAccessTasksMeetings(user) {
   if (isAdminLike(user)) {
     return true;
   }
 
-  return user?.type === "none";
+  return normalizeUserType(user?.type) === "none";
 }
 
 function canAccessCommunications(user) {
+  const userType = normalizeUserType(user?.type);
+
   if (isAdminLike(user)) {
     return true;
   }
 
-  return Boolean(user?.type) && user.type !== "none";
+  return Boolean(userType) && userType !== "none";
 }
 
 function resolveCommunicationTypeScope(user) {
-  if (isAdminLike(user) || user?.type === "global") {
+  const userType = normalizeUserType(user?.type);
+
+  if (isAdminLike(user) || userType === "global") {
     return null;
   }
 
-  if (!user?.type || user.type === "none") {
+  if (!userType || userType === "none") {
     return "none";
   }
 
-  return user.type;
+  return userType;
 }
 
 function canMutateCommunicationType(user, type) {
+  const userType = normalizeUserType(user?.type);
+
   if (isAdminLike(user)) {
     return true;
   }
 
-  if (!user?.type || user.type === "none") {
+  if (!userType || userType === "none") {
     return false;
   }
 
-  if (user.type === "global") {
+  if (userType === "global") {
     return true;
   }
 
-  return user.type === type;
+  return userType === type;
 }
 
 function requireTasksMeetingsAccess(req, res, next) {

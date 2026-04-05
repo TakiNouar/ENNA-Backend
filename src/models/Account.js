@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const ACCOUNT_ROLES = ["root", "admin", "user"];
 const ACCOUNT_TYPE_VALUES = [
   "global",
-  "radar",
+  "surveillance",
   "com",
   "nav",
   "atm",
