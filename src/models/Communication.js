@@ -12,6 +12,11 @@ const communicationSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    entryId: {
+      type: String,
+      default: "",
+      index: true,
+    },
     number: {
       type: String,
       required: true,
@@ -35,6 +40,10 @@ const communicationSchema = new mongoose.Schema(
       default: "",
     },
     equipment: {
+      type: String,
+      default: "",
+    },
+    responsible: {
       type: String,
       default: "",
     },

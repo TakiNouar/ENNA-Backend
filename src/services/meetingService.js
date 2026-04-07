@@ -23,6 +23,10 @@ function toIsoString(value) {
   return date.toISOString();
 }
 
+function resolveActorUsername(actor) {
+  return sanitizeText(actor?.username);
+}
+
 class MeetingService {
   extractMeetingSequence(value) {
     const text = sanitizeText(value);
@@ -125,6 +129,7 @@ class MeetingService {
 
     return {
       id: sanitizeText(meeting.id) || randomUUID(),
+      entryId: sanitizeText(meeting.entryId),
       number: sanitizeText(meeting.number || meeting.num),
       subject: sanitizeText(
         meeting.subject || meeting.name || meeting.title,
@@ -150,6 +155,7 @@ class MeetingService {
   toPersistenceMeeting(meeting) {
     return {
       id: meeting.id,
+      entryId: meeting.entryId,
       number: meeting.number,
       subject: meeting.subject,
       priority: meeting.priority,
@@ -226,13 +232,15 @@ class MeetingService {
     );
   }
 
-  async createMeeting(payload) {
+  async createMeeting(payload, actor) {
     const input = validateMeetingInput(payload);
     const autoNumber = await this.getNextMeetingNumber();
+    const entryId = resolveActorUsername(actor);
 
     const timestamp = new Date().toISOString();
     const meeting = this.normalizeStoredMeeting({
       id: randomUUID(),
+      entryId,
       ...input,
       number: input.number || autoNumber,
       createdAt: timestamp,
@@ -246,7 +254,7 @@ class MeetingService {
     return meeting;
   }
 
-  async updateMeeting(meetingId, payload) {
+  async updateMeeting(meetingId, payload, actor) {
     const input = validateMeetingInput(payload, {
       partial: true,
     });
@@ -261,6 +269,7 @@ class MeetingService {
     const meeting =
       this.normalizeStoredMeeting(existingMeeting);
     this.applyMeetingInput(meeting, input);
+    meeting.entryId = resolveActorUsername(actor);
     meeting.updatedAt = new Date().toISOString();
 
     await Meeting.updateOne(

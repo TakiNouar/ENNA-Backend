@@ -15,6 +15,7 @@ async function createMeeting(req, res, next) {
   try {
     const meeting = await meetingService.createMeeting(
       req.body,
+      req.user,
     );
     return res.status(201).json({ meeting });
   } catch (error) {
@@ -27,6 +28,7 @@ async function updateMeeting(req, res, next) {
     const meeting = await meetingService.updateMeeting(
       req.params.meetingId,
       req.body,
+      req.user,
     );
     return res.json({ meeting });
   } catch (error) {

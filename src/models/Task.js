@@ -12,6 +12,11 @@ const taskSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    entryId: {
+      type: String,
+      default: "",
+      index: true,
+    },
     num: {
       type: String,
       default: "",
