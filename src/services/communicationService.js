@@ -30,6 +30,10 @@ function toIsoString(value) {
   return date.toISOString();
 }
 
+function resolveActorUsername(actor) {
+  return sanitizeText(actor?.username);
+}
+
 class CommunicationService {
   extractCommunicationSequence(value) {
     const text = sanitizeText(value);
@@ -131,6 +135,7 @@ class CommunicationService {
 
     return {
       id: sanitizeText(row.id) || randomUUID(),
+      entryId: sanitizeText(row.entryId),
       number: sanitizeText(row.number),
       type: COMMUNICATION_TYPE_VALUES.includes(type)
         ? type
@@ -140,6 +145,7 @@ class CommunicationService {
         : "active",
       site: sanitizeText(row.site),
       equipment: sanitizeText(row.equipment),
+      responsible: sanitizeText(row.responsible),
       date: sanitizeText(row.date),
       observation: sanitizeText(row.observation || row.obs),
       createdAt: toIsoString(row.createdAt),
@@ -152,11 +158,13 @@ class CommunicationService {
   toPersistenceCommunication(row) {
     return {
       id: row.id,
+      entryId: row.entryId,
       number: row.number,
       type: row.type,
       status: row.status,
       site: row.site,
       equipment: row.equipment,
+      responsible: row.responsible,
       date: row.date,
       observation: row.observation,
       createdAt: new Date(row.createdAt),
@@ -187,6 +195,14 @@ class CommunicationService {
       )
     ) {
       row.equipment = input.equipment;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(
+        input,
+        "responsible",
+      )
+    ) {
+      row.responsible = input.responsible;
     }
     if (
       Object.prototype.hasOwnProperty.call(input, "date")
@@ -273,9 +289,11 @@ class CommunicationService {
     const autoNumber =
       await this.getNextCommunicationNumber();
     const timestamp = new Date().toISOString();
+    const entryId = resolveActorUsername(user);
 
     const row = this.normalizeStoredCommunication({
       id: randomUUID(),
+      entryId,
       number: autoNumber,
       ...input,
       createdAt: timestamp,
@@ -323,6 +341,7 @@ class CommunicationService {
 
     this.applyCommunicationInput(row, input);
     this.assertMutatePermission(user, row.type);
+    row.entryId = resolveActorUsername(user);
     row.updatedAt = new Date().toISOString();
 
     await Communication.updateOne(

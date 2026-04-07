@@ -8,6 +8,11 @@ const meetingSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    entryId: {
+      type: String,
+      default: "",
+      index: true,
+    },
     number: {
       type: String,
       default: "",

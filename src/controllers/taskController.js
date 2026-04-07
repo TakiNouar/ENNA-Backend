@@ -11,7 +11,10 @@ async function listTasks(req, res, next) {
 
 async function createTask(req, res, next) {
   try {
-    const task = await taskService.createTask(req.body);
+    const task = await taskService.createTask(
+      req.body,
+      req.user,
+    );
     return res.status(201).json({ task });
   } catch (error) {
     return next(error);
@@ -23,6 +26,7 @@ async function updateTask(req, res, next) {
     const task = await taskService.updateTask(
       req.params.taskId,
       req.body,
+      req.user,
     );
     return res.json({ task });
   } catch (error) {

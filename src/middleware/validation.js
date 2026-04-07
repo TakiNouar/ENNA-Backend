@@ -419,6 +419,8 @@ function validateCommunicationInput(
   const shouldValidateSite = !partial || has("site");
   const shouldValidateEquipment =
     !partial || has("equipment");
+  const shouldValidateResponsible =
+    !partial || has("responsible");
   const shouldValidateDate = !partial || has("date");
   const shouldValidateObservation =
     !partial || has("observation") || has("obs");
@@ -455,6 +457,18 @@ function validateCommunicationInput(
       );
     }
     result.equipment = equipment;
+  }
+
+  if (shouldValidateResponsible) {
+    const responsible = sanitizeText(
+      input.responsible || "",
+    );
+    if (responsible.length > 160) {
+      throw new Error(
+        "Communication responsible is too long",
+      );
+    }
+    result.responsible = responsible;
   }
 
   if (shouldValidateDate) {

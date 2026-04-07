@@ -21,6 +21,10 @@ function toIsoString(value) {
   return date.toISOString();
 }
 
+function resolveActorUsername(actor) {
+  return sanitizeText(actor?.username);
+}
+
 class TaskService {
   normalizeStoredTask(task = {}) {
     const status = sanitizeText(task.status).toLowerCase();
@@ -29,6 +33,7 @@ class TaskService {
     ).toLowerCase();
     const normalized = {
       id: sanitizeText(task.id) || randomUUID(),
+      entryId: sanitizeText(task.entryId),
       num: sanitizeText(task.num),
       name: sanitizeText(task.name || task.title),
       about: sanitizeText(task.about || task.description),
@@ -63,6 +68,7 @@ class TaskService {
   toPersistenceTask(task) {
     return {
       id: task.id,
+      entryId: task.entryId,
       num: task.num,
       name: task.name,
       about: task.about,
@@ -177,12 +183,14 @@ class TaskService {
     );
   }
 
-  async createTask(payload) {
+  async createTask(payload, actor) {
     const input = validateTaskInput(payload);
+    const entryId = resolveActorUsername(actor);
 
     const timestamp = new Date().toISOString();
     const task = this.normalizeStoredTask({
       id: randomUUID(),
+      entryId,
       ...input,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -193,7 +201,7 @@ class TaskService {
     return task;
   }
 
-  async updateTask(taskId, payload) {
+  async updateTask(taskId, payload, actor) {
     const input = validateTaskInput(payload, {
       partial: true,
     });
@@ -207,6 +215,7 @@ class TaskService {
 
     const task = this.normalizeStoredTask(existingTask);
     this.applyTaskInput(task, input);
+    task.entryId = resolveActorUsername(actor);
     task.updatedAt = new Date().toISOString();
 
     await Task.updateOne(
